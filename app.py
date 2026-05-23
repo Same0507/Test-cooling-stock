@@ -24,8 +24,10 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 # 2. ฟังก์ชันดึงข้อมูลล่าสุด (ดึงจากแท็บ parts และ history)
 def load_data():
     # ดึงข้อมูลจากแผ่นงานชื่อ parts และ history
-    parts_df = conn.read(worksheet="parts", ttl="0")       # ttl="0" เพื่อบังคับดึงข้อมูลสดใหม่ตลอดเวลา
-    history_df = conn.read(worksheet="history", ttl="0")
+    # ใช้เลข 0 (Integer) หรือใส่ ttl=None เพื่อไม่จำกัดแคชและดึงข้อมูลใหม่เสมอ
+    parts_df = conn.read(worksheet="parts", ttl=0)
+    history_df = conn.read(worksheet="history", ttl=0)
+
     return parts_df, history_df
 
 # 3. เรียกใช้งานฟังก์ชันดึงข้อมูลมาเก็บไว้ในตัวแปรสำหรับใช้งานในแอป
