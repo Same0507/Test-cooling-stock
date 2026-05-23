@@ -15,35 +15,33 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
-# --- [วางทับตรงนี้] เริ่มต้นส่วนการเชื่อมต่อฐานข้อมูล Google Sheets ---
-
-# 1. ประกาศตัวเชื่อมต่อเชื่อมไปยัง Google Sheets
+# 1. เชื่อมต่อกับ Google Sheets ผ่าน st.connection
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 2. ฟังก์ชันดึงข้อมูลล่าสุด (ดึงจากแท็บ parts และ history)
-def load_data():
-    # ดึงข้อมูลจากแผ่นงานชื่อ parts และ history
-    # ใช้เลข 0 (Integer) หรือใส่ ttl=None เพื่อไม่จำกัดแคชและดึงข้อมูลใหม่เสมอ
-    parts_df = conn.read(worksheet="parts", ttl=0)
-    history_df = conn.read(worksheet="history", ttl=0)
+# 🔴 [จุดสำคัญ] วางลิงก์ Google Sheets ของคุณแทนที่ข้อความในเครื่องหมายอัญประกาศด้านล่างนี้ได้เลยครับ
+# ตัวอย่าง: GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/1Xxxxxxx/edit?usp=sharing"
+GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/1eCEehZDeWRxBE5tVDcoft23R5HwLdrMymL9bJ9nGsCA/edit?gid=0#gid=0"
 
+# ฟังก์ชันดึงข้อมูลล่าสุดจาก Google Sheets ออกมาแสดงผล
+def load_data():
+    # ดึงข้อมูลโดยส่งค่าลิงก์ URL ตรงๆ ป้องกันปัญหาหา Secrets ไม่เจอ
+    parts_df = conn.read(spreadsheet=GOOGLE_SHEETS_URL, worksheet="parts", ttl="0") 
+    history_df = conn.read(spreadsheet=GOOGLE_SHEETS_URL, worksheet="history", ttl="0")
     return parts_df, history_df
 
-# 3. เรียกใช้งานฟังก์ชันดึงข้อมูลมาเก็บไว้ในตัวแปรสำหรับใช้งานในแอป
+# โหลดข้อมูลเข้าสู่แอปพลิเคชัน
 df_parts, df_history = load_data()
 
-# ปรับประเภทข้อมูลตัวเลขจำนวนให้ถูกต้อง ป้องกันความผิดพลาดตอนคำนวณ
+# ปรับประเภทข้อมูลจำนวนให้เป็นตัวเลข เพื่อป้องกันความผิดพลาดในการคำนวณ
 df_parts['quantity'] = df_parts['quantity'].astype(int)
 df_parts['min_stock'] = df_parts['min_stock'].astype(int)
 
-
-# 4. ฟังก์ชันสำหรับอัปเดตสต๊อกกลับไปยัง Google Sheets เมื่อช่างกดปุ่ม
+# --- ฟังก์ชันหลัก: อัปเดตข้อมูลกลับไปยัง Google Sheets ---
 def update_stock_gsheets(part_idx, change_amount, action_type, tech_name, current_parts_df, current_history_df):
-    # คำนวณจำนวนสต๊อกใหม่ในแถวที่เลือก
+    # 1. คำนวณจำนวนสต๊อกใหม่
     current_parts_df.at[part_idx, 'quantity'] += change_amount
     
-    # บันทึกประวัติกิจกรรมของช่างเพิ่มเข้าไป 1 บรรทัด
+    # 2. บันทึกประวัติกิจกรรมใหม่
     new_log = pd.DataFrame([{
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "part_name": current_parts_df.at[part_idx, 'name'],
@@ -51,16 +49,12 @@ def update_stock_gsheets(part_idx, change_amount, action_type, tech_name, curren
         "amount": abs(change_amount),
         "technician": tech_name if tech_name else "ไม่ระบุชื่อ"
     }])
-    
-    # นำประวัติใหม่ไปต่อเชื่อมด้านบนสุดของประวัติเดิม
+    # เอาประวัติใหม่ไปต่อด้านบนสุดของประวัติเดิม
     updated_history_df = pd.concat([new_log, current_history_df], ignore_index=True)
     
-    # สั่งเขียนข้อมูลทับกลับไปยัง Google Sheets ทั้ง 2 แท็บทันที
-    conn.update(worksheet="parts", data=current_parts_df)
-    conn.update(worksheet="history", data=updated_history_df)
-
-# --- จบส่วนระบบจัดการฐานข้อมูลหลังบ้าน ---
-
+    # 3. สั่งอัปเดตอัปโหลดกลับไปที่ Google Sheets ทั้ง 2 แท็บ (ใส่ URL กำกับไว้ด้วย)
+    conn.update(spreadsheet=GOOGLE_SHEETS_URL, worksheet="parts", data=current_parts_df)
+    conn.update(spreadsheet=GOOGLE_SHEETS_URL, worksheet="history", data=updated_history_df)
 
 # --- ส่วนแสดงผล UI ---
 st.title("❄️ ระบบสต๊อกเครื่องเย็น (ผ่าน Google Sheets)")
