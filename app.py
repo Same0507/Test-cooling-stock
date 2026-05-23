@@ -52,25 +52,71 @@ elif menu == "🔄 เบิก / รับเข้า":
     
     tech_name = st.text_input("ชื่อช่าง:")
     action = st.selectbox("ทำรายการ:", ["เบิกของ (นำไปใช้)", "รับเข้า (ซื้อมาเพิ่ม)"])
-    part_selected = st.selectbox("เลือกอะไหล่:", inv_df['part_name'].tolist())
+    
+    st.markdown("---")
+    # เพิ่มตัวเลือกให้เลือกว่าจะใช้อะไหล่เดิม หรือเพิ่มใหม่
+    part_option = st.radio("ประเภทอะไหล่:", ["ค้นหาจากระบบ (มีอยู่แล้ว)", "เพิ่มอะไหล่ใหม่ (รับเข้าครั้งแรก)"], horizontal=True)
+    
+    # ตัวแปรสำหรับเก็บข้อมูลอะไหล่
+    price_per_unit = 0.0
+    min_stock = 0
+    
+    if part_option == "ค้นหาจากระบบ (มีอยู่แล้ว)":
+        part_selected = st.selectbox("เลือกอะไหล่:", inv_df['part_name'].tolist())
+    else:
+        part_selected = st.text_input("ชื่ออะไหล่ใหม่:")
+        col1, col2 = st.columns(2)
+        with col1:
+            price_per_unit = st.number_input("ราคาต่อหน่วย (บาท):", min_value=0.0, step=10.0)
+        with col2:
+            min_stock = st.number_input("จุดแจ้งเตือนของหมด (Min Stock):", min_value=0, step=1)
+            
+        if action == "เบิกของ (นำไปใช้)":
+            st.warning("⚠️ การเพิ่มชื่ออะไหล่ใหม่ ควรเป็นการทำรายการ 'รับเข้า (ซื้อมาเพิ่ม)'")
+
+    st.markdown("---")
     qty = st.number_input("จำนวน:", min_value=1, step=1)
     job_ref = st.text_input("เลขที่งานซ่อม (ถ้ามี):")
     
     if st.button("💾 บันทึกรายการ", type="primary", use_container_width=True):
         if not tech_name:
             st.error("กรุณาใส่ชื่อช่าง!")
+        elif not part_selected:
+            st.error("กรุณาระบุชื่ออะไหล่!")
         else:
-            part_idx = inv_df.index[inv_df['part_name'] == part_selected].tolist()[0]
-            current_qty = inv_df.at[part_idx, 'quantity']
-            
-            if action == "เบิกของ (นำไปใช้)":
-                if current_qty < qty:
-                    st.error("❌ ของในสต๊อกไม่พอ!")
+            # กรณี: เพิ่มอะไหล่ใหม่
+            if part_option == "เพิ่มอะไหล่ใหม่ (รับเข้าครั้งแรก)":
+                if part_selected in inv_df['part_name'].values:
+                    st.error("❌ มีอะไหล่ชื่อนี้ในระบบแล้ว กรุณากลับไปเลือก 'ค้นหาจากระบบ'")
                     st.stop()
-                inv_df.at[part_idx, 'quantity'] = current_qty - qty
-            else:
-                inv_df.at[part_idx, 'quantity'] = current_qty + qty
+                if action == "เบิกของ (นำไปใช้)":
+                    st.error("❌ ไม่สามารถเบิกอะไหล่ที่ยังไม่มีในสต๊อกได้ กรุณาเปลี่ยนเป็น 'รับเข้า'")
+                    st.stop()
                 
+                # สร้าง DataFrame สำหรับอะไหล่ใหม่
+                new_part_data = {
+                    "part_name": part_selected,
+                    "quantity": qty,
+                    "price_per_unit": price_per_unit,
+                    "min_stock": min_stock
+                }
+                new_inv = pd.DataFrame([new_part_data])
+                inv_df = pd.concat([inv_df, new_inv], ignore_index=True)
+                
+            # กรณี: อะไหล่เดิมที่มีในระบบ
+            else:
+                part_idx = inv_df.index[inv_df['part_name'] == part_selected].tolist()[0]
+                current_qty = inv_df.at[part_idx, 'quantity']
+                
+                if action == "เบิกของ (นำไปใช้)":
+                    if current_qty < qty:
+                        st.error(f"❌ ของในสต๊อกไม่พอ! (มีอยู่ {current_qty} ชิ้น)")
+                        st.stop()
+                    inv_df.at[part_idx, 'quantity'] = current_qty - qty
+                else:
+                    inv_df.at[part_idx, 'quantity'] = current_qty + qty
+                    
+            # บันทึกประวัติลง History
             new_hist = pd.DataFrame([{
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "tech_name": tech_name,
@@ -81,11 +127,11 @@ elif menu == "🔄 เบิก / รับเข้า":
             }])
             hist_df = pd.concat([hist_df, new_hist], ignore_index=True)
             
-            # บันทึกข้อมูลกลับไปยังแผ่นงาน (Worksheet) ที่ถูกต้อง
+            # บันทึกข้อมูลกลับไปยัง Google Sheets
             conn.update(worksheet="Inventory", data=inv_df)
             conn.update(worksheet="History", data=hist_df)
             st.cache_data.clear()
-            st.success("✅ บันทึกข้อมูลเรียบร้อย!")
+            st.success(f"✅ บันทึกรายการ {action} สำหรับ '{part_selected}' จำนวน {qty} ชิ้น เรียบร้อย!")
 
 # ================= 3. หน้าคำนวณค่าซ่อม =================
 elif menu == "💰 คำนวณค่าซ่อม":
