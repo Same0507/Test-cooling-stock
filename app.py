@@ -20,7 +20,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 # 🔴 [จุดสำคัญ] วางลิงก์ Google Sheets ของคุณแทนที่ข้อความในเครื่องหมายอัญประกาศด้านล่างนี้ได้เลยครับ
 # ตัวอย่าง: GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/1Xxxxxxx/edit?usp=sharing"
-GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/1eCEehZDeWRxBE5tVDcoft23R5HwLdrMymL9bJ9nGsCA/edit?gid=0#gid=0"
+GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/1eCEehZDeWRxBE5tVDcoft23R5HwLdrMymL9bJ9nGsCA/edit?usp=sharing"
 
 # ฟังก์ชันดึงข้อมูลล่าสุดจาก Google Sheets ออกมาแสดงผล
 def load_data():
