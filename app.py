@@ -137,19 +137,60 @@ elif menu == "🔄 เบิก / รับเข้า":
 elif menu == "💰 คำนวณค่าซ่อม":
     st.subheader("🧮 คำนวณค่าใช้จ่ายงานซ่อม")
     
+    # 1. เลือกอะไหล่ที่ใช้ (Multiselect)
     selected_parts = st.multiselect("เลือกอะไหล่ที่ใช้:", inv_df['part_name'].tolist())
+    
+    # 2. กรอกค่าแรง
     labor_cost = st.number_input("ค่าแรงช่าง (บาท):", min_value=0, step=100)
     
+    total_parts_cost = 0.0
+    
     if selected_parts:
-        total_parts_cost = 0
+        st.markdown("### 📝 รายละเอียดและจำนวน")
+        
+        # สร้าง loop เพื่อสร้างช่องกรอกจำนวนสำหรับแต่ละอะไหล่ที่เลือก
         for part in selected_parts:
+            # ดึงราคาต่อหน่วยจาก DataFrame
             price = inv_df.loc[inv_df['part_name'] == part, 'price_per_unit'].values[0]
-            st.write(f"- {part} : {price} บาท")
-            total_parts_cost += price
+            
+            # แบ่งคอลัมน์เพื่อให้ UI ดูสวยงาม (ชื่ออะไหล่ | ช่องกรอกจำนวน | ราคารวม)
+            col1, col2, col3 = st.columns([3, 2, 2])
+            
+            with col1:
+                st.write(f"**{part}**")
+                st.caption(f"ราคาหน่วยละ {price:,.2f} บาท")
+            
+            with col2:
+                # ใช้ key โดยการรวมชื่ออะไหล่ เพื่อไม่ให้ ID ของ widget ซ้ำกัน
+                qty = st.number_input(f"จำนวนที่ใช้", min_value=1, step=1, key=f"qty_{part}")
+                
+            with col3:
+                item_total = price * qty
+                st.write(f"**{item_total:,.2f} บาท**")
+            
+            total_parts_cost += item_total
             
         st.markdown("---")
-        st.metric("รวมค่าอะไหล่", f"{total_parts_cost:,.2f} บาท")
-        st.metric("รวมสุทธิ (ค่าอะไหล่ + ค่าแรง)", f"{total_parts_cost + labor_cost:,.2f} บาท")
+        
+        # แสดงผลสรุป
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("รวมค่าอะไหล่ทั้งสิ้น", f"{total_parts_cost:,.2f} บาท")
+        with c2:
+            st.metric("รวมสุทธิ (อะไหล่ + ค่าแรง)", f"{total_parts_cost + labor_cost:,.2f} บาท")
+            
+        # ปุ่มสำหรับช่วยสรุปข้อความ (เผื่อก๊อปปี้ไปส่งงาน)
+        if st.button("📋 สรุปรายการสำหรับส่งงาน"):
+            summary_text = f"🛠️ สรุปค่าซ่อม\n"
+            summary_text += f"----------------\n"
+            for part in selected_parts:
+                p = inv_df.loc[inv_df['part_name'] == part, 'price_per_unit'].values[0]
+                summary_text += f"- {part} x{qty} ชิ้น\n"
+            summary_text += f"----------------\n"
+            summary_text += f"รวมค่าอะไหล่: {total_parts_cost:,.2f} บาท\n"
+            summary_text += f"ค่าแรงช่าง: {labor_cost:,.2f} บาท\n"
+            summary_text += f"ยอดรวมสุทธิ: {total_parts_cost + labor_cost:,.2f} บาท"
+            st.code(summary_text)
 
 # ================= 4. หน้าประวัติรายการ =================
 elif menu == "📜 ประวัติรายการ":
